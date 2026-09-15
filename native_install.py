@@ -16,12 +16,13 @@ from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parent
 
-RULES = '''## DeepSeek Delegation (Native Official Adapter)
+RULES = '''## External Model Delegation (Native Adapter)
 
-- When the user explicitly requests a DS/DeepSeek subagent, use the provided native_delegate_task tool with model=deepseek-flash and a unique task_name. Default reasoning_effort is high; an explicit user choice of low, medium, high or xhigh overrides the default. Put readable task instructions, required context, authorized file paths and acceptance criteria in task_text. Mentioning a model alone does not authorize delegation.
-- The adapter maps this to genuine Codex collaboration.spawn_agent with fork_turns=none. DeepSeek goes directly to its configured official API through the local adapter. The primary model retains its existing provider route.
+- When the user explicitly requests an external-model subagent, use native_delegate_task with the exact model ID exposed by the tool and a unique task_name. DeepSeek defaults to deepseek-flash and high; an explicit user effort overrides the default. Other models use their configured default effort unless the user chooses one. Put readable task instructions, required context, authorized file paths and acceptance criteria in task_text. Mentioning a model alone does not authorize delegation.
+- The adapter maps this to genuine Codex collaboration.spawn_agent with fork_turns=none. External models use their configured Responses-compatible routes. The primary model retains its existing provider route.
 - Use native_followup_task for later work on the same child and native_message_task for a running child. Use available native collaboration wait/list/interrupt tools for lifecycle. Independently verify returned files and tests. Initial delegation, file reading/writing and idle followup have been verified; running-message delivery, stopping and concurrency require actual verification.
-- If plaintext alias tools are absent or the model is unknown, report that the current backend has not loaded integration. Fully quit Codex and reopen through the native DS launcher. Do not silently substitute another transport or reinterpret ciphertext as plaintext.
+- If plaintext alias tools are absent or the model is unknown, report that the current backend has not loaded integration. Fully quit Codex and reopen through the native external-model launcher. Do not silently substitute another model or transport, and do not reinterpret ciphertext as plaintext.
+- Do not hardcode a provider list outside the adapter configuration.
 - Preserve unrelated model preferences and never print credentials or task content.
 
 '''
@@ -62,8 +63,9 @@ def render_config(text, provider, settings, token):
     return rendered
 
 def render_rules(text):
-    if '## DeepSeek Delegation' in text:
-        start = text.index('## DeepSeek Delegation')
+    heading = next((value for value in ('## External Model Delegation', '## DeepSeek Delegation') if value in text), None)
+    if heading:
+        start = text.index(heading)
         following = re.search(r'^## ', text[start+3:], re.M)
         end = start + 3 + following.start() if following else len(text)
         return text[:start] + RULES + text[end:]

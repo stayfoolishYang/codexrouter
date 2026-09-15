@@ -15,6 +15,10 @@ Codex Desktop
 `collaboration.spawn_agent`。子代理拥有 Codex 原生任务窗口、文件工具、终端工具和
 followup；它不是独立 CLI 进程。
 
+`native_delegate_task` 可选的模型 ID 从本地 `settings.json` 的 `routes` 动态生成。
+以后增加其他 Responses 兼容路由时，审阅规则可以直接选择新模型，不需要在 Skill
+里维护固定供应商列表。
+
 DeepSeek Flash 排队时会持续返回 keep-alive。适配器先请求真实
 `deepseek-flash`，超过约 20 秒仍未开始推理时切换到官方
 `deepseek-v4-pro`，避免 Codex 将子代理判定为断流。路由日志只记录模型名、

@@ -43,6 +43,8 @@ class InstallRenderingTests(unittest.TestCase):
         self.assertTrue(result.startswith('# Global\n\n## Models\nKeep models.'))
         self.assertTrue(result.endswith('## Skill Selection\nKeep skills.\n'))
         self.assertNotIn('Old rule.', result)
-        self.assertEqual(result.count('## DeepSeek Delegation'), 1)
+        self.assertEqual(result.count('## External Model Delegation'), 1)
+        self.assertNotIn('## DeepSeek Delegation', result)
+        self.assertEqual(render_rules(result), result)
 
 if __name__ == '__main__': unittest.main()
