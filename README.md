@@ -50,6 +50,7 @@ python native_install.py --activate
 其中填写 Responses 网关和 API Key、调用 `/models` 获取模型列表、添加或修改模型、
 选择主代理模型，并设置审阅模式及外部子代理默认档位。API Key 只写入 Windows
 用户环境变量，页面不回显，`settings.json` 只保存变量名。
+界面会跟随 Windows 的浅色或深色系统主题，并在窄窗口自动切换为单列布局。
 
 审阅模式支持：
 
@@ -89,8 +90,8 @@ python "$env:USERPROFILE/.codex/native-model-adapter/native_launcher.py" rollbac
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-离线测试覆盖消息映射、SSE、Flash 排队回退、本地鉴权、凭据隔离、配置安装、
-目录生成和启动修复。真实 API 可用性仍由 DeepSeek 服务端决定。
+离线测试覆盖消息映射、SSE、Flash 排队回退、本地鉴权、凭据隔离、配置 UI、
+配置安装、目录生成和启动修复。真实 API 可用性仍由模型服务端决定。
 
 ## 安全边界
 
