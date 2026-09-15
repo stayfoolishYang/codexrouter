@@ -92,10 +92,11 @@ def catalog(settings):
     for model in settings['routes']:
         models[:] = [m for m in models if m['slug'] != model]
         child = copy.deepcopy(template)
-        child.update(slug=model, display_name=model + ' (native / official)', description='External model through local native Responses adapter',
+        provider_name = settings['routes'][model].get('provider_name', 'external')
+        child.update(slug=model, display_name=model + ' (' + provider_name + ')', description='External model through local Responses adapter',
                      visibility='list', supported_in_api=True, default_reasoning_level=settings['routes'][model].get('default_effort', 'medium'),
                      supported_reasoning_levels=[{'effort': e, 'description': e} for e in settings['routes'][model].get('efforts', ['medium'])],
-                     base_instructions='You are a native coding subagent running through Codex. Follow the parent task, project instructions, tool permission checks and sandbox limits. Use available tools to inspect and edit only authorized files. On Windows use PowerShell, and never invoke apply_patch as a shell command; use a provided apply_patch tool if present or write files through supported shell operations. Report verified changes, tests and limitations. Do not access secrets. Do not delegate without authorization.')
+                     base_instructions='You are a coding agent running through Codex. Follow the task, project instructions, tool permission checks and sandbox limits. Use available tools to inspect and edit only authorized files. On Windows use PowerShell, and never invoke apply_patch as a shell command; use a provided apply_patch tool if present or write files through supported shell operations. Report verified changes, tests and limitations. Do not access secrets. Do not delegate without authorization.')
         child.pop('model_messages', None)
         child.pop('upgrade', None)
         child['service_tiers'] = []
@@ -121,7 +122,7 @@ def start(settings):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['start', 'open', 'repair', 'serve', 'status', 'rollback'])
+    parser.add_argument('action', choices=['start', 'open', 'ui', 'repair', 'serve', 'status', 'rollback'])
     args = parser.parse_args()
     settings = json.loads((ROOT / 'settings.json').read_text())
     if args.action == 'serve':
@@ -161,6 +162,10 @@ def main():
     if args.action == 'status':
         print(json.dumps({'ready': check(settings), 'port': settings['port'], 'models': list(settings['routes'])}))
         return
+    if args.action == 'ui':
+        import config_ui
+        config_ui.run(ROOT)
+        return
     catalog(settings)
     start(settings)
     if args.action in ('open', 'repair'):
@@ -193,7 +198,7 @@ if __name__ == '__main__':
         # pythonw and scheduled-task invocations have no console; retain a credential-free error.
         with (ROOT / 'launcher-errors.log').open('a', encoding='utf-8') as log:
             log.write(type(error).__name__ + ': ' + str(error) + '\n')
-        if os.name == 'nt' and 'open' in sys.argv:
+        if os.name == 'nt' and any(action in sys.argv for action in ('open', 'ui')):
             import ctypes
             ctypes.windll.user32.MessageBoxW(None, 'Native DS startup failed. See:\n' + str(ROOT / 'launcher-errors.log'), 'Codex Native DS', 16)
         raise

@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tomllib
 
-from native_install import atomic_write, delete_service_task, register_service_task, stop_owned_service
+from native_install import atomic_write, delete_service_task, register_service_task, settings_shortcut, stop_owned_service
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
             raise RuntimeError('Adapter port is active; finish tasks and stop the owned service before upgrade.')
     backup = root / 'backups' / ('repair-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     backup.mkdir(parents=True)
-    names = ['native_launcher.py', 'native_gateway.py', 'native_install.py', 'settings.json', 'adapter-token.txt', 'deployment.json']
+    names = ['native_launcher.py', 'native_gateway.py', 'native_install.py', 'config_ui.py', 'config_ui.html', 'settings.json', 'adapter-token.txt', 'deployment.json']
     for name in names:
         if (root / name).exists():
             shutil.copy2(root / name, backup / name)
@@ -40,7 +40,7 @@ def main():
         raise RuntimeError('Existing adapter token mismatch; files preserved.')
     token = token or secrets.token_urlsafe(32)
     settings['token_sha256'] = hashlib.sha256(token.encode()).hexdigest()
-    for name in ['native_launcher.py', 'native_gateway.py', 'native_install.py']:
+    for name in ['native_launcher.py', 'native_gateway.py', 'native_install.py', 'config_ui.py', 'config_ui.html']:
         atomic_write(root / name, (Path(__file__).parent / name).read_bytes())
     atomic_write(root / 'adapter-token.txt', token.encode())
     registered = not settings.get('scheduled_task')
@@ -57,6 +57,13 @@ def main():
             except Exception as cleanup_error:
                 error.add_note('Failed to remove the partial scheduled task: ' + str(cleanup_error))
         raise
+    shortcut = settings_shortcut(root, settings['desktop_exe'])
+    manifest = root / 'deployment.json'
+    if manifest.exists():
+        deployment = json.loads(manifest.read_text())
+        if shortcut not in deployment.setdefault('shortcuts', []):
+            deployment['shortcuts'].append(shortcut)
+            atomic_write(manifest, json.dumps(deployment, indent=2).encode())
     print('Adapter repaired; backup: ' + str(backup))
     print('The current desktop backend still requires a full reload to use restored routing.')
 

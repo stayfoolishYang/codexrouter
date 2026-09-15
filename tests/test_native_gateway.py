@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from native_gateway import History, EventMapper, Server, native_args, prepare_request, open_with_queue_fallback
+from native_gateway import History, EventMapper, Server, native_args, prepare_request, open_with_queue_fallback, routing_instructions
 from native_launcher import desktop_environment
 
 ROUTES = {'deepseek-flash': {'base_url': 'https://api.deepseek.com', 'key_env': 'DEEPSEEK_API_KEY', 'efforts': ['medium'], 'queue_fallback_model': 'deepseek-v4-pro', 'queue_fallback_seconds': 20}}
@@ -70,9 +70,20 @@ class NativeGatewayTests(unittest.TestCase):
         self.assertEqual(out['input'][0]['role'], 'user')
         self.assertEqual(out['input'][1], req['input'][1])
         self.assertEqual(out['reasoning']['effort'], 'high')
+        self.assertFalse(any(tool.get('name') == 'native_delegate_task' for tool in out.get('tools', [])))
         self.assertEqual(req['input'][0]['type'], 'agent_message')
         req['input'][0]['content'] = []
         with self.assertRaises(ValueError): prepare_request(req, {'routes': ROUTES}, self.history)
+
+    def test_external_primary_can_delegate_and_uses_configured_review_mode(self):
+        settings = {'routes': ROUTES, 'review': {'mode': 'external', 'model': 'deepseek-flash', 'effort': 'medium'},
+                    'subagent': {'model': 'deepseek-flash', 'effort': 'medium'}}
+        out = prepare_request({'model': 'deepseek-flash', 'input': [], 'tools': []}, settings, self.history)
+        self.assertTrue(any(tool.get('name') == 'native_delegate_task' for tool in out['tools']))
+        self.assertIn('model=deepseek-flash and reasoning_effort=medium', out['instructions'])
+
+    def test_review_mode_defaults_to_terra_high(self):
+        self.assertIn('model=gpt-5.6-terra and reasoning_effort=high', routing_instructions({'routes': ROUTES}))
 
     def test_invalid_model_effort_and_opaque_task_rejected(self):
         base = {'task_name': 'x', 'task_text': 'task', 'model': 'deepseek-flash', 'reasoning_effort': 'medium'}

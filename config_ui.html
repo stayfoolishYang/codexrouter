@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CodexRouter 设置</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #eef1f5;
+      --panel: #ffffff;
+      --panel-2: #f7f8fa;
+      --line: #d8dde5;
+      --text: #172033;
+      --muted: #687386;
+      --accent: #185abd;
+      --accent-hover: #124c9f;
+      --accent-soft: #e8f0fc;
+      --success: #137333;
+      --danger: #b42318;
+      --danger-soft: #fdf0ef;
+      --shadow: 0 18px 45px rgb(26 39 64 / 10%);
+      --radius: 14px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f141b;
+        --panel: #171d26;
+        --panel-2: #1d2530;
+        --line: #303b49;
+        --text: #eef3fa;
+        --muted: #9aa8ba;
+        --accent: #70a7ff;
+        --accent-hover: #91bbff;
+        --accent-soft: #1d3557;
+        --success: #6fd58a;
+        --danger: #ff8b82;
+        --danger-soft: #3a2425;
+        --shadow: 0 22px 55px rgb(0 0 0 / 32%);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    button, input, select { font: inherit; }
+    button, select, input { min-height: 40px; }
+    button { cursor: pointer; }
+
+    .shell {
+      width: min(1440px, calc(100% - 32px));
+      margin: 24px auto;
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      min-height: calc(100vh - 48px);
+    }
+    aside {
+      padding: 24px 18px;
+      border-right: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; margin: 0 8px 30px; }
+    .mark {
+      display: grid; place-items: center; width: 34px; height: 34px;
+      border-radius: 9px; background: var(--accent); color: white;
+      font-weight: 750; letter-spacing: -1px;
+    }
+    .brand strong { display: block; font-size: 16px; letter-spacing: -.2px; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    nav { display: grid; gap: 6px; }
+    nav button {
+      width: 100%; border: 0; border-radius: 9px; padding: 0 12px;
+      background: transparent; color: var(--muted); text-align: left;
+    }
+    nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+    .aside-note { margin: 28px 10px 0; color: var(--muted); font-size: 12px; }
+
+    main { min-width: 0; }
+    header {
+      min-height: 84px; padding: 18px 28px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: -.4px; }
+    header p { margin: 3px 0 0; color: var(--muted); }
+    .status-pill {
+      white-space: nowrap; padding: 7px 11px; border-radius: 999px;
+      color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent);
+      font-size: 12px; font-weight: 650;
+    }
+
+    .content { padding: 28px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .section-head { margin-bottom: 18px; }
+    .section-head h2 { margin: 0 0 4px; font-size: 19px; }
+    .section-head p { margin: 0; color: var(--muted); }
+    .grid { display: grid; gap: 18px; }
+    .grid.two { grid-template-columns: minmax(0, 1.1fr) minmax(340px, .9fr); }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+    .card-head {
+      padding: 16px 18px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .card-head h3 { margin: 0; font-size: 15px; }
+    .card-body { padding: 18px; }
+    .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+    .metric { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+    .metric span { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong { display: block; margin-top: 6px; font-size: 16px; overflow-wrap: anywhere; }
+
+    label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 650; }
+    input, select {
+      width: 100%; border: 1px solid var(--line); border-radius: 9px;
+      padding: 8px 10px; background: var(--panel); color: var(--text); outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    input::placeholder { color: color-mix(in srgb, var(--muted) 72%, transparent); }
+    .field { margin-bottom: 14px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+    .secret-state { color: var(--success); }
+
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .btn {
+      border: 1px solid var(--line); border-radius: 9px; padding: 0 14px;
+      background: var(--panel); color: var(--text); font-weight: 600;
+    }
+    .btn:hover { background: var(--panel-2); }
+    .btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .btn.primary:hover { background: var(--accent-hover); }
+    .btn.danger { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); color: var(--danger); }
+    .btn.small { min-height: 32px; padding: 0 10px; font-size: 12px; }
+    .btn:disabled { cursor: wait; opacity: .6; }
+
+    .route-list { display: grid; gap: 10px; }
+    .route {
+      padding: 14px; border: 1px solid var(--line); border-radius: 11px;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    }
+    .route-title { font-weight: 700; overflow-wrap: anywhere; }
+    .route-meta { margin-top: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .badge { display: inline-block; margin-right: 6px; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+    .empty { padding: 30px 16px; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 11px; }
+
+    .efforts { display: flex; flex-wrap: wrap; gap: 8px; }
+    .check { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); }
+    .check input { width: 16px; min-height: auto; height: 16px; margin: 0; box-shadow: none; }
+
+    .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+    .mode {
+      position: relative; padding: 16px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--panel); cursor: pointer;
+    }
+    .mode:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+    .mode input { position: absolute; opacity: 0; pointer-events: none; }
+    .mode strong { display: block; margin-bottom: 5px; }
+    .mode span { display: block; color: var(--muted); font-size: 12px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .notice { margin-top: 18px; padding: 13px 15px; border-radius: 10px; background: var(--accent-soft); color: var(--text); }
+    .notice strong { color: var(--accent); }
+
+    .toast {
+      position: fixed; right: 24px; bottom: 24px; z-index: 10; max-width: 420px;
+      padding: 13px 16px; border-radius: 10px; background: #152238; color: #fff;
+      box-shadow: var(--shadow); opacity: 0; transform: translateY(10px); pointer-events: none;
+      transition: .18s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: var(--danger); }
+
+    @media (max-width: 940px) {
+      .shell { grid-template-columns: 1fr; width: min(100% - 20px, 760px); margin: 10px auto; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 14px; }
+      .brand { margin: 0 4px 12px; }
+      nav { grid-template-columns: repeat(3, 1fr); }
+      nav button { text-align: center; }
+      .aside-note { display: none; }
+      .grid.two, .split { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .shell { width: 100%; margin: 0; border: 0; border-radius: 0; min-height: 100vh; }
+      header, .content { padding: 18px; }
+      header { align-items: flex-start; }
+      .status-pill { display: none; }
+      .metric-row, .mode-grid, .field-row { grid-template-columns: 1fr; }
+      nav button { padding: 0 4px; font-size: 12px; }
+      .route { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand"><div class="mark">CR</div><div><strong>CodexRouter</strong><span>本地模型控制台</span></div></div>
+      <nav>
+        <button class="active" data-view="overview">概览</button>
+        <button data-view="models">模型与网关</button>
+        <button data-view="routing">审阅与子代理</button>
+      </nav>
+      <p class="aside-note">所有配置保存在本机。API Key 写入 Windows 用户环境变量，不进入项目文件。</p>
+    </aside>
+    <main>
+      <header>
+        <div><h1 id="page-title">配置概览</h1><p id="page-subtitle">管理主代理、第三方模型与审阅路由</p></div>
+        <span class="status-pill">仅限本机访问</span>
+      </header>
+      <div class="content">
+        <section class="view active" id="view-overview">
+          <div class="metric-row">
+            <div class="metric"><span>当前主代理模型</span><strong id="metric-primary">—</strong></div>
+            <div class="metric"><span>第三方模型</span><strong id="metric-routes">—</strong></div>
+            <div class="metric"><span>默认审阅模式</span><strong id="metric-review">—</strong></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>主代理模型</h3></div>
+            <div class="card-body">
+              <div class="field"><label for="primary-model">Codex 启动时使用的模型</label><select id="primary-model"></select><p class="hint">可选择原有模型，也可选择已添加的第三方模型。</p></div>
+              <div class="button-row"><button class="btn primary" id="save-primary">保存主代理模型</button></div>
+            </div>
+          </div>
+          <div class="notice"><strong>生效方式：</strong>保存会立即写入配置和刷新模型目录。请完成正在运行的任务，然后彻底退出 Codex（包括托盘）并重新打开。</div>
+        </section>
+
+        <section class="view" id="view-models">
+          <div class="section-head"><h2>模型与网关</h2><p>添加 Responses 兼容服务，获取模型列表并配置默认档位。</p></div>
+          <div class="grid two">
+            <div class="card">
+              <div class="card-head"><h3>已配置模型</h3><button class="btn small" id="new-route">新增模型</button></div>
+              <div class="card-body"><div class="route-list" id="route-list"></div></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3 id="route-form-title">新增第三方模型</h3></div>
+              <form class="card-body" id="route-form">
+                <input type="hidden" id="original-model-id">
+                <div class="field-row">
+                  <div class="field"><label for="provider-name">供应商名称</label><input id="provider-name" placeholder="例如 DeepSeek"></div>
+                  <div class="field"><label for="key-env">API Key 环境变量</label><input id="key-env" value="EXTERNAL_MODEL_API_KEY" autocomplete="off"></div>
+                </div>
+                <div class="field"><label for="base-url">Responses 网关</label><input id="base-url" type="url" placeholder="https://api.example.com/v1" required></div>
+                <div class="field"><label for="api-key">API Key</label><input id="api-key" type="password" autocomplete="new-password" placeholder="留空则保留环境变量中的现有值"><p class="hint" id="key-state">不会写入 settings.json。</p></div>
+                <div class="button-row field"><button type="button" class="btn" id="discover-models">获取模型列表</button><span class="hint" id="discover-status"></span></div>
+                <div class="field"><label for="discovered-model">获取到的模型</label><select id="discovered-model" disabled><option value="">先获取模型列表</option></select></div>
+                <div class="field"><label for="model-id">模型 ID</label><input id="model-id" placeholder="例如 deepseek-flash" required></div>
+                <div class="field"><label>支持的推理档位</label><div class="efforts" id="effort-checks"></div></div>
+                <div class="field"><label for="default-effort">默认子代理档位</label><select id="default-effort"></select></div>
+                <div class="button-row"><button type="submit" class="btn primary">保存模型</button><button type="button" class="btn" id="reset-route">重置</button></div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-routing">
+          <div class="section-head"><h2>审阅与子代理</h2><p>设置未显式指定模式时采用的审阅方式，以及外部子代理默认参数。</p></div>
+          <div class="card">
+            <div class="card-head"><h3>默认审阅模式</h3></div>
+            <div class="card-body">
+              <div class="mode-grid">
+                <label class="mode"><input type="radio" name="review-mode" value="terra"><strong>Terra High</strong><span>默认推荐。新建 Terra 高档审阅子代理，主代理复核。</span></label>
+                <label class="mode"><input type="radio" name="review-mode" value="primary"><strong>主代理审理</strong><span>由当前 Sol、Astra 或其他主代理直接完成审阅。</span></label>
+                <label class="mode"><input type="radio" name="review-mode" value="external"><strong>外部模型审阅</strong><span>新建 DeepSeek 或其他已配置模型作为审阅子代理。</span></label>
+              </div>
+              <div class="split">
+                <div>
+                  <div class="field"><label for="review-model">外部审阅模型</label><select id="review-model"></select></div>
+                  <div class="field"><label for="review-effort">外部审阅档位</label><select id="review-effort"></select></div>
+                </div>
+                <div>
+                  <div class="field"><label for="subagent-model">默认外部子代理模型</label><select id="subagent-model"></select></div>
+                  <div class="field"><label for="subagent-effort">默认外部子代理档位</label><select id="subagent-effort"></select></div>
+                </div>
+              </div>
+              <div class="button-row"><button class="btn primary" id="save-preferences">保存审阅与子代理设置</button><button class="btn" id="close-ui">关闭设置服务</button></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const TOKEN = __UI_TOKEN__;
+    const EFFORTS = ["low", "medium", "high", "xhigh"];
+    let state = null;
+    const $ = (id) => document.getElementById(id);
+
+    history.replaceState({}, "", "/");
+
+    async function request(path, body) {
+      const options = { headers: { "X-CodexRouter-UI": TOKEN } };
+      if (body !== undefined) {
+        options.method = "POST";
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(body);
+      }
+      const response = await fetch(path, options);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      return payload;
+    }
+
+    function toast(message, error = false) {
+      const node = $("toast");
+      node.textContent = message;
+      node.classList.toggle("error", error);
+      node.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => node.classList.remove("show"), 3500);
+    }
+
+    function option(value, label = value) {
+      const node = document.createElement("option");
+      node.value = value;
+      node.textContent = label;
+      return node;
+    }
+
+    function fillEffortSelect(node, values, selected) {
+      node.replaceChildren(...values.map(value => option(value)));
+      node.value = values.includes(selected) ? selected : values[0] || "";
+    }
+
+    function selectedMode() {
+      return document.querySelector('input[name="review-mode"]:checked')?.value || "terra";
+    }
+
+    function externalRoute(modelId) {
+      return state.routes.find(route => route.model_id === modelId);
+    }
+
+    function syncEffortFor(modelSelect, effortSelect, preferred) {
+      const route = externalRoute(modelSelect.value);
+      fillEffortSelect(effortSelect, route?.efforts || [], preferred || route?.default_effort);
+    }
+
+    function renderPrimary() {
+      const select = $("primary-model");
+      select.replaceChildren();
+      const nativeGroup = document.createElement("optgroup");
+      nativeGroup.label = "当前 provider";
+      state.primary_models.forEach(model => nativeGroup.append(option(model.id, model.name)));
+      const externalGroup = document.createElement("optgroup");
+      externalGroup.label = "第三方模型";
+      state.routes.forEach(route => externalGroup.append(option(route.model_id, `${route.provider_name || "外部"} · ${route.model_id}`)));
+      select.append(nativeGroup, externalGroup);
+      if (![...select.options].some(item => item.value === state.current_model)) select.prepend(option(state.current_model));
+      select.value = state.current_model;
+    }
+
+    function renderRoutes() {
+      const list = $("route-list");
+      list.replaceChildren();
+      if (!state.routes.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "还没有第三方模型。填写右侧网关并获取模型列表。";
+        list.append(empty);
+        return;
+      }
+      state.routes.forEach(route => {
+        const row = document.createElement("div");
+        row.className = "route";
+        const info = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "route-title";
+        title.textContent = route.model_id;
+        const meta = document.createElement("div");
+        meta.className = "route-meta";
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = route.provider_name || "外部模型";
+        meta.append(badge, document.createTextNode(`${route.base_url} · 默认 ${route.default_effort}`));
+        info.append(title, meta);
+        const actions = document.createElement("div");
+        actions.className = "button-row";
+        const edit = document.createElement("button");
+        edit.className = "btn small"; edit.textContent = "编辑"; edit.onclick = () => editRoute(route);
+        const remove = document.createElement("button");
+        remove.className = "btn small danger"; remove.textContent = "删除"; remove.onclick = () => deleteRoute(route.model_id);
+        actions.append(edit, remove); row.append(info, actions); list.append(row);
+      });
+    }
+
+    function renderRouting() {
+      const routes = state.routes;
+      for (const id of ["review-model", "subagent-model"]) {
+        const select = $(id);
+        select.replaceChildren(...routes.map(route => option(route.model_id, `${route.provider_name || "外部"} · ${route.model_id}`)));
+      }
+      document.querySelector(`input[name="review-mode"][value="${state.review.mode}"]`)?.click();
+      $("review-model").value = routes.some(r => r.model_id === state.review.model) ? state.review.model : routes[0]?.model_id || "";
+      $("subagent-model").value = routes.some(r => r.model_id === state.subagent.model) ? state.subagent.model : routes[0]?.model_id || "";
+      syncEffortFor($("review-model"), $("review-effort"), state.review.effort);
+      syncEffortFor($("subagent-model"), $("subagent-effort"), state.subagent.effort);
+      updateReviewDisabled();
+    }
+
+    function renderMetrics() {
+      $("metric-primary").textContent = state.current_model || "未设置";
+      $("metric-routes").textContent = `${state.routes.length} 个`;
+      $("metric-review").textContent = ({terra: "Terra High", primary: "主代理审理", external: "外部模型"})[state.review.mode] || "Terra High";
+    }
+
+    function render() {
+      renderPrimary(); renderRoutes(); renderRouting(); renderMetrics();
+    }
+
+    async function refresh() {
+      state = await request("/api/state");
+      render();
+    }
+
+    function resetRoute() {
+      $("route-form").reset();
+      $("original-model-id").value = "";
+      $("key-env").value = "EXTERNAL_MODEL_API_KEY";
+      $("route-form-title").textContent = "新增第三方模型";
+      $("key-state").textContent = "不会写入 settings.json。";
+      $("discovered-model").replaceChildren(option("", "先获取模型列表"));
+      $("discovered-model").disabled = true;
+      $("effort-checks").querySelectorAll("input").forEach(input => input.checked = true);
+      fillEffortSelect($("default-effort"), EFFORTS, "high");
+    }
+
+    function editRoute(route) {
+      document.querySelector('[data-view="models"]').click();
+      $("route-form-title").textContent = `编辑 ${route.model_id}`;
+      $("original-model-id").value = route.model_id;
+      $("provider-name").value = route.provider_name;
+      $("base-url").value = route.base_url;
+      $("key-env").value = route.key_env;
+      $("api-key").value = "";
+      $("model-id").value = route.model_id;
+      $("key-state").innerHTML = route.key_configured ? '<span class="secret-state">Windows 环境变量中已有密钥；留空即可保留。</span>' : "当前环境变量尚未配置密钥。";
+      $("effort-checks").querySelectorAll("input").forEach(input => input.checked = route.efforts.includes(input.value));
+      fillEffortSelect($("default-effort"), route.efforts, route.default_effort);
+    }
+
+    async function deleteRoute(modelId) {
+      if (!confirm(`删除模型 ${modelId}？API Key 环境变量会保留。`)) return;
+      try { const result = await request("/api/route/delete", {model_id: modelId}); toast(result.message); await refresh(); resetRoute(); }
+      catch (error) { toast(error.message, true); }
+    }
+
+    function updateReviewDisabled() {
+      const disabled = selectedMode() !== "external";
+      $("review-model").disabled = disabled;
+      $("review-effort").disabled = disabled;
+    }
+
+    EFFORTS.forEach(value => {
+      const label = document.createElement("label"); label.className = "check";
+      const input = document.createElement("input"); input.type = "checkbox"; input.value = value; input.checked = true;
+      input.addEventListener("change", () => {
+        const selected = [...$("effort-checks").querySelectorAll("input:checked")].map(item => item.value);
+        fillEffortSelect($("default-effort"), selected, $("default-effort").value);
+      });
+      label.append(input, document.createTextNode(value)); $("effort-checks").append(label);
+    });
+    fillEffortSelect($("default-effort"), EFFORTS, "high");
+
+    document.querySelectorAll("nav button").forEach(button => button.addEventListener("click", () => {
+      document.querySelectorAll("nav button").forEach(item => item.classList.toggle("active", item === button));
+      document.querySelectorAll(".view").forEach(view => view.classList.toggle("active", view.id === `view-${button.dataset.view}`));
+      const titles = {overview: ["配置概览", "管理主代理、第三方模型与审阅路由"], models: ["模型与网关", "添加、修改或删除第三方 Responses 模型"], routing: ["审阅与子代理", "控制默认审阅模式和外部子代理档位"]};
+      [$("page-title").textContent, $("page-subtitle").textContent] = titles[button.dataset.view];
+    }));
+
+    $("new-route").onclick = resetRoute;
+    $("reset-route").onclick = resetRoute;
+    $("discovered-model").onchange = event => { if (event.target.value) $("model-id").value = event.target.value; };
+    $("review-model").onchange = () => syncEffortFor($("review-model"), $("review-effort"));
+    $("subagent-model").onchange = () => syncEffortFor($("subagent-model"), $("subagent-effort"));
+    document.querySelectorAll('input[name="review-mode"]').forEach(input => input.onchange = updateReviewDisabled);
+
+    $("discover-models").onclick = async () => {
+      const button = $("discover-models"); button.disabled = true; $("discover-status").textContent = "正在连接…";
+      try {
+        const result = await request("/api/discover", {base_url: $("base-url").value, api_key: $("api-key").value, key_env: $("key-env").value});
+        const select = $("discovered-model"); select.replaceChildren(option("", `选择模型（${result.models.length}）`), ...result.models.map(id => option(id)));
+        select.disabled = false; $("discover-status").textContent = `已获取 ${result.models.length} 个模型`;
+      } catch (error) { $("discover-status").textContent = ""; toast(error.message, true); }
+      finally { button.disabled = false; }
+    };
+
+    $("route-form").onsubmit = async event => {
+      event.preventDefault();
+      const efforts = [...$("effort-checks").querySelectorAll("input:checked")].map(input => input.value);
+      try {
+        const result = await request("/api/route/save", {
+          original_model_id: $("original-model-id").value, provider_name: $("provider-name").value,
+          base_url: $("base-url").value, key_env: $("key-env").value, api_key: $("api-key").value,
+          model_id: $("model-id").value, efforts, default_effort: $("default-effort").value
+        });
+        toast(result.message); await refresh(); resetRoute();
+      } catch (error) { toast(error.message, true); }
+    };
+
+    $("save-primary").onclick = async () => {
+      try { const result = await request("/api/primary", {model: $("primary-model").value}); toast(result.message); await refresh(); }
+      catch (error) { toast(error.message, true); }
+    };
+
+    $("save-preferences").onclick = async () => {
+      try {
+        const result = await request("/api/preferences", {
+          review_mode: selectedMode(), review_model: $("review-model").value, review_effort: $("review-effort").value,
+          subagent_model: $("subagent-model").value, subagent_effort: $("subagent-effort").value
+        });
+        toast(result.message); await refresh();
+      } catch (error) { toast(error.message, true); }
+    };
+
+    $("close-ui").onclick = async () => {
+      try { await request("/api/close", {}); document.body.innerHTML = '<main style="display:grid;place-items:center;min-height:100vh"><p>CodexRouter 设置服务已关闭，可以关闭此标签页。</p></main>'; }
+      catch (error) { toast(error.message, true); }
+    };
+
+    refresh().then(resetRoute).catch(error => toast(error.message, true));
+  </script>
+</body>
+</html>

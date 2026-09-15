@@ -97,6 +97,39 @@ def native_args(alias, args, routes):
         raise ValueError('Native target required')
     return {'target': target, 'message': message}
 
+def routing_instructions(settings):
+    review = settings.get('review', {'mode': 'terra'})
+    subagent = settings.get('subagent', {})
+    mode = review.get('mode', 'terra')
+    if mode == 'primary':
+        review_rule = 'For a review or audit without an explicit mode, review it in the current primary agent; do not create a reviewer child.'
+    elif mode == 'external':
+        model = review.get('model', '')
+        effort = review.get('effort', settings.get('routes', {}).get(model, {}).get('default_effort', 'medium'))
+        review_rule = f'For a review or audit without an explicit mode, create one native external reviewer with model={model} and reasoning_effort={effort}.'
+    else:
+        review_rule = 'For a review or audit without an explicit mode, create one bounded collaboration subagent with model=gpt-5.6-terra and reasoning_effort=high. Do not allow recursive delegation.'
+    default_model = subagent.get('model', '')
+    default_effort = subagent.get('effort', settings.get('routes', {}).get(default_model, {}).get('default_effort', 'medium'))
+    external_default = ''
+    if default_model:
+        external_default = f' When the user explicitly requests an external-model subagent without naming a model, use model={default_model} and reasoning_effort={default_effort}.'
+    return ('\nConfigured review routing: ' + review_rule +
+            ' An explicit user-selected review mode, model, effort, or no-subagent instruction overrides this default.' +
+            external_default)
+
+def add_external_tools(req, settings):
+    req['tools'] = [tool for tool in req.get('tools', []) if tool.get('name') not in ALIASES] + tools_for(settings['routes'])
+    req['instructions'] = (req.get('instructions') or '') + (
+        '\nExternal native subagents: when the user authorizes delegation to a configured external model, '
+        'use native_delegate_task with explicit plaintext task_text and the exact configured model ID. '
+        'This maps to genuine Codex collaboration.spawn_agent with fork_turns=none. For later messages use '
+        'native_message_task or native_followup_task. Use ordinary collaboration wait/list/interrupt tools '
+        'for lifecycle. Do not call collaboration.spawn_agent directly for external models, since its message '
+        'may be encrypted upstream. Include needed context and authorized file boundaries in task_text. '
+        'Do not delegate unless authorized. Do not silently substitute a model or transport. Ordinary GPT '
+        'subagents retain their existing native tools.') + routing_instructions(settings)
+
 class History:
     """Only restore calls actually mapped by this adapter, across restarts."""
     def __init__(self, path):
@@ -130,6 +163,8 @@ class History:
 
 def prepare_request(req, settings, history):
     req = copy.deepcopy(req)
+    restored = [history.restore(item) for item in req.get('input', [])]
+    child_request = any(item.get('type') == 'agent_message' for item in restored)
     if req.get('model') in settings['routes']:
         reasoning = req.get('reasoning')
         if isinstance(reasoning, dict) and reasoning.get('effort'):
@@ -138,7 +173,7 @@ def prepare_request(req, settings, history):
                 'high': 'high', 'xhigh': 'high', 'max': 'max', 'ultra': 'max'
             }.get(reasoning['effort'], reasoning['effort'])
         converted = []
-        for item in req.get('input', []):
+        for item in restored:
             if item.get('type') == 'agent_message':
                 content = item.get('content', [])
                 if not content or any(c.get('type') != 'input_text' for c in content):
@@ -147,18 +182,12 @@ def prepare_request(req, settings, history):
             else:
                 converted.append(item)
         req['input'] = converted
+        if not child_request:
+            add_external_tools(req, settings)
     else:
-        req['tools'] = [t for t in req.get('tools', []) if t.get('name') not in ALIASES] + tools_for(settings['routes'])
-        req['instructions'] = (req.get('instructions') or '') + (
-            '\nExternal native subagents: when the user authorizes delegation to a configured external model, '
-            'use native_delegate_task with explicit plaintext task_text and model. This maps to genuine '
-            'Codex collaboration.spawn_agent with fork_turns=none. For later messages use native_message_task '
-            'or native_followup_task. Use ordinary collaboration wait/list/interrupt tools for lifecycle. '
-            'Do not call collaboration.spawn_agent directly for external models, since its message may be '
-            'encrypted upstream. Include needed context and authorized file boundaries in task_text. '
-            'Do not delegate unless authorized. Do not silently substitute a CLI worker or another model. '
-            'Ordinary GPT subagents retain their existing native tools.')
-        req['input'] = [history.restore(item) for item in req.get('input', [])]
+        req['input'] = restored
+        if not child_request:
+            add_external_tools(req, settings)
     return req
 
 class EventMapper:
@@ -299,23 +328,18 @@ class Handler(BaseHTTPRequestHandler):
                         if sum(map(len, frame)) > 4_000_000: raise ValueError('Oversized SSE frame')
                         continue
                     data = b'\n'.join(v[5:].strip() for v in frame if v.startswith(b'data:'))
-                    if external:
-                        self.wfile.write(b''.join(frame) + b'\n'); self.wfile.flush()
-                        terminal = (data == b'[DONE]')
-                        if data and data != b'[DONE]':
-                            terminal = json.loads(data).get('type') in {
-                                'response.completed', 'response.failed', 'response.incomplete'
-                            }
-                        frame = []
-                        if terminal:
-                            break
-                        continue
                     if data and data != b'[DONE]':
-                        for event in mapper.event(json.loads(data)):
+                        source_event = json.loads(data)
+                        for event in mapper.event(source_event):
                             self.wfile.write(('event: ' + event.get('type', 'message') + '\ndata: ' + json.dumps(event, ensure_ascii=False) + '\n\n').encode())
+                        terminal = source_event.get('type') in {
+                            'response.completed', 'response.failed', 'response.incomplete'
+                        }
                     else:
                         self.wfile.write(b''.join(frame) + b'\n')
+                        terminal = data == b'[DONE]'
                     frame = []; self.wfile.flush()
+                    if terminal: break
                 if frame: raise ValueError('Incomplete upstream SSE frame')
         except HTTPError as error:
             if not started: self.send_error(error.code, 'Selected upstream request failed')

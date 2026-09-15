@@ -121,17 +121,38 @@ def desktop_shortcut(root, desktop_exe):
     code = (
         '$nativeLinkShell = New-Object -ComObject WScript.Shell; '
         '$nativeDesktop = [Environment]::GetFolderPath("Desktop"); '
-        '$nativeLinkPath = Join-Path $nativeDesktop "Codex（原生 DS）.lnk"; '
-        'if (Test-Path -LiteralPath $nativeLinkPath) { throw "Shortcut already exists; inspect before replacing" }; '
-        '$nativeLink = $nativeLinkShell.CreateShortcut($nativeLinkPath); '
-        f'$nativeLink.TargetPath = {ps_quote(pythonw)}; '
-        f'$nativeLink.Arguments = {ps_quote(chr(34)+str(launcher)+chr(34)+" open")}; '
-        f'$nativeLink.WorkingDirectory = {ps_quote(root)}; $nativeLink.IconLocation = {ps_quote(desktop_exe)}; '
-        '$nativeLink.Save(); ConvertTo-Json -Compress -InputObject @($nativeLinkPath)')
+        '$nativeCodexLink = Join-Path $nativeDesktop "Codex（原生 DS）.lnk"; '
+        '$nativeSettingsLink = Join-Path $nativeDesktop "CodexRouter 设置.lnk"; '
+        'if ((Test-Path -LiteralPath $nativeCodexLink) -or (Test-Path -LiteralPath $nativeSettingsLink)) { throw "Shortcut already exists; inspect before replacing" }; '
+        '$nativeLink = $nativeLinkShell.CreateShortcut($nativeCodexLink); '
+        f'$nativeLink.TargetPath = {ps_quote(pythonw)}; $nativeLink.Arguments = {ps_quote(chr(34)+str(launcher)+chr(34)+" open")}; '
+        f'$nativeLink.WorkingDirectory = {ps_quote(root)}; $nativeLink.IconLocation = {ps_quote(desktop_exe)}; $nativeLink.Save(); '
+        '$nativeUiLink = $nativeLinkShell.CreateShortcut($nativeSettingsLink); '
+        f'$nativeUiLink.TargetPath = {ps_quote(pythonw)}; $nativeUiLink.Arguments = {ps_quote(chr(34)+str(launcher)+chr(34)+" ui")}; '
+        f'$nativeUiLink.WorkingDirectory = {ps_quote(root)}; $nativeUiLink.IconLocation = {ps_quote(desktop_exe)}; $nativeUiLink.Save(); '
+        'ConvertTo-Json -Compress -InputObject @($nativeCodexLink,$nativeSettingsLink)')
     result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', code], capture_output=True, text=True,
                             check=True, creationflags=subprocess.CREATE_NO_WINDOW)
     value = json.loads(result.stdout)
     return [value] if isinstance(value, str) else value
+
+def settings_shortcut(root, desktop_exe):
+    pythonw = Path(sys.executable).with_name('pythonw.exe')
+    if not pythonw.exists():
+        pythonw = Path(sys.executable)
+    launcher = root / 'native_launcher.py'
+    code = (
+        '$nativeLinkShell = New-Object -ComObject WScript.Shell; '
+        '$nativeDesktop = [Environment]::GetFolderPath("Desktop"); '
+        '$nativeLinkPath = Join-Path $nativeDesktop "CodexRouter 设置.lnk"; '
+        'if (-not (Test-Path -LiteralPath $nativeLinkPath)) { '
+        '$nativeLink = $nativeLinkShell.CreateShortcut($nativeLinkPath); '
+        f'$nativeLink.TargetPath = {ps_quote(pythonw)}; $nativeLink.Arguments = {ps_quote(chr(34)+str(launcher)+chr(34)+" ui")}; '
+        f'$nativeLink.WorkingDirectory = {ps_quote(root)}; $nativeLink.IconLocation = {ps_quote(desktop_exe)}; $nativeLink.Save(); }}; '
+        'ConvertTo-Json -Compress -InputObject $nativeLinkPath')
+    result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', code], capture_output=True, text=True,
+                            check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    return json.loads(result.stdout)
 
 def main():
     parser = argparse.ArgumentParser(description='Install reviewed native DS routing with backups. Requires a full Codex exit/reopen afterward.')
@@ -162,7 +183,9 @@ def main():
     if not desktop_exe.is_file(): raise RuntimeError('Installed Codex desktop not found')
     token = secrets.token_urlsafe(32)
     settings = {'port': port, 'instance_id': str(uuid.uuid4()), 'parent_base_url': upstream,
-                'routes': {'deepseek-flash': {'base_url': 'https://api.deepseek.com', 'key_env': 'DEEPSEEK_API_KEY', 'queue_fallback_model': 'deepseek-v4-pro', 'queue_fallback_seconds': 20, 'route_log': str(root/'route-audit.jsonl'), 'efforts': ['low', 'medium', 'high', 'xhigh'], 'default_effort': 'high'}},
+                'routes': {'deepseek-flash': {'provider_name': 'DeepSeek', 'base_url': 'https://api.deepseek.com', 'key_env': 'DEEPSEEK_API_KEY', 'queue_fallback_model': 'deepseek-v4-pro', 'queue_fallback_seconds': 20, 'route_log': str(root/'route-audit.jsonl'), 'efforts': ['low', 'medium', 'high', 'xhigh'], 'default_effort': 'high'}},
+                'review': {'mode': 'terra', 'model': 'deepseek-flash', 'effort': 'high'},
+                'subagent': {'model': 'deepseek-flash', 'effort': 'high'},
                 'token_sha256': hashlib.sha256(token.encode()).hexdigest(), 'state_file': str(root/'call-aliases.json'),
                 'source_catalog': source, 'catalog_file': str(root/'models.json'), 'codex_home': str(home),
                 'desktop_exe': str(desktop_exe), 'original_provider': provider}
@@ -179,7 +202,7 @@ def main():
         shutil.copy2(target, backup_file)
         files.append({'target': str(target), 'backup': str(backup_file), 'installed_sha256': hashlib.sha256(data).hexdigest()})
     stop_owned_service(root)
-    for name in ['native_gateway.py', 'native_launcher.py', 'native_install.py']:
+    for name in ['native_gateway.py', 'native_launcher.py', 'native_install.py', 'config_ui.py', 'config_ui.html']:
         shutil.copy2(PROJECT/name, root/name)
     atomic_write(root/'adapter-token.txt', token.encode())
     try:
