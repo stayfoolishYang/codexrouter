@@ -19,9 +19,9 @@ PROJECT = Path(__file__).resolve().parent
 RULES = '''## DeepSeek Delegation (Native Official Adapter)
 
 - When the user explicitly requests a DS/DeepSeek subagent, use the provided native_delegate_task tool with model=deepseek-flash and a unique task_name. Default reasoning_effort is high; an explicit user choice of low, medium, high or xhigh overrides the default. Put readable task instructions, required context, authorized file paths and acceptance criteria in task_text. Mentioning a model alone does not authorize delegation.
-- The adapter maps this to genuine Codex collaboration.spawn_agent with fork_turns=none. DeepSeek goes directly to its official API through the local adapter; it does not use AiMaMi. Astra retains its existing upstream provider route.
+- The adapter maps this to genuine Codex collaboration.spawn_agent with fork_turns=none. DeepSeek goes directly to its configured official API through the local adapter. The primary model retains its existing provider route.
 - Use native_followup_task for later work on the same child and native_message_task for a running child. Use available native collaboration wait/list/interrupt tools for lifecycle. Independently verify returned files and tests. Initial delegation, file reading/writing and idle followup have been verified; running-message delivery, stopping and concurrency require actual verification.
-- If plaintext alias tools are absent or the model is unknown, report that the current backend has not loaded integration. Fully quit Codex and reopen through the native DS launcher. Do not silently substitute CLI/AiMaMi or reinterpret ciphertext as plaintext.
+- If plaintext alias tools are absent or the model is unknown, report that the current backend has not loaded integration. Fully quit Codex and reopen through the native DS launcher. Do not silently substitute another transport or reinterpret ciphertext as plaintext.
 - Preserve unrelated model preferences and never print credentials or task content.
 
 '''
@@ -151,8 +151,8 @@ def main():
     provider = config['model_provider']
     source = config['model_catalog_json']
     upstream = config['model_providers'][provider]['base_url']
-    if upstream != 'http://127.0.0.1:25817/codex/router/v1':
-        raise RuntimeError('Upstream differs from the tested current provider; review before installing')
+    if not isinstance(upstream, str) or not upstream.strip():
+        raise RuntimeError('The current provider needs a base_url before installing')
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
     package = subprocess.run(['powershell.exe', '-NoProfile', '-Command', 'Get-AppxPackage -Name OpenAI.Codex | Select-Object -First 1 -ExpandProperty InstallLocation'], capture_output=True, text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW)

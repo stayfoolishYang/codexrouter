@@ -1,13 +1,13 @@
 # CodexRouter
 
-让 Codex Desktop 通过原生子代理界面调用 DeepSeek，同时保留现有 Astra 上游。
+让 Codex Desktop 通过原生子代理界面调用 DeepSeek，同时保留当前主模型上游。
 
 ## 工作方式
 
 ```text
 Codex Desktop
   └─ 本地 Responses 适配器
-       ├─ Astra → 原 AiMaMi 上游
+       ├─ 主模型 → 当前 Codex provider
        └─ DS 子代理 → DeepSeek 官方 API
 ```
 
@@ -25,7 +25,7 @@ DeepSeek Flash 排队时会持续返回 keep-alive。适配器先请求真实
 - Windows 10/11
 - Python 3.11+
 - Codex Desktop；已验证版本 `0.154.0-alpha.6.2`
-- 已运行的 AiMaMi：`http://127.0.0.1:25817/codex/router/v1`
+- 已配置可用的 Codex 主模型 provider（Responses API）
 - 用户环境变量 `DEEPSEEK_API_KEY`
 
 项目只使用 Python 标准库。

@@ -22,7 +22,7 @@ class LauncherTests(unittest.TestCase):
         self.path.write_text(BASE)
         (self.root / 'adapter-token.txt').write_text('test-token')
         self.settings = dict(codex_home=str(self.root), port=12345,
-                             original_provider='aimai1', parent_base_url='http://127.0.0.1:25817/codex/router/v1',
+                             original_provider='primary', parent_base_url='https://gateway.example.test/v1',
                              token_sha256=hashlib.sha256(b'test-token').hexdigest(), catalog_file=str(self.root / 'models.json'))
 
     def test_restore_then_idempotent(self):
@@ -36,7 +36,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(len(list((self.root / 'backups').iterdir())), 1)
 
     def test_unrelated_route_preserved(self):
-        self.path.write_text(BASE.replace('25817', '9999'))
+        self.path.write_text(BASE.replace('gateway.example.test', 'other.example.test'))
         before = self.path.read_bytes()
         with self.assertRaises(RuntimeError): native_launcher.reconcile_config(self.settings)
         self.assertEqual(before, self.path.read_bytes())
