@@ -9,10 +9,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from native_gateway import History, EventMapper, Server, native_args, prepare_request, open_with_queue_fallback, routing_instructions
+from native_gateway import History, EventMapper, Server, native_args, prepare_request, open_with_queue_fallback, open_with_retry, routing_instructions
 from native_launcher import desktop_environment
 
 ROUTES = {'deepseek-flash': {'base_url': 'https://api.deepseek.com', 'key_env': 'DEEPSEEK_API_KEY', 'efforts': ['medium'], 'queue_fallback_model': 'deepseek-v4-pro', 'queue_fallback_seconds': 20}}
@@ -155,6 +155,48 @@ class NativeGatewayTests(unittest.TestCase):
         self.assertIsNone(first)
         self.assertTrue(primary.was_closed)
         self.assertEqual([r['model'] for r in requests], ['deepseek-flash', 'deepseek-v4-pro'])
+
+    def test_parent_upstream_retries_transient_failure(self):
+        response = io.BytesIO(b'event: response.completed\n')
+        response.status = 200
+        response.headers = {'Content-Type': 'text/event-stream'}
+        outcomes = [HTTPError('http://127.0.0.1/responses', 502, 'failure', {}, None), response]
+        class Opener:
+            def __init__(self): self.calls = 0
+            def open(self, request, **kwargs):
+                result = outcomes[self.calls]; self.calls += 1
+                if isinstance(result, Exception): raise result
+                return result
+        opener = Opener()
+        with patch('native_gateway.time.sleep') as sleep:
+            self.assertIs(open_with_retry(opener, object(), 180, sleep=sleep), response)
+        self.assertEqual(opener.calls, 2)
+        sleep.assert_called_once_with(0.4)
+
+    def test_parent_upstream_does_not_retry_bad_request(self):
+        error = HTTPError('http://127.0.0.1/responses', 400, 'failure', {}, None)
+        class Opener:
+            def __init__(self): self.calls = 0
+            def open(self, request, **kwargs): self.calls += 1; raise error
+        opener = Opener()
+        with self.assertRaises(HTTPError), patch('native_gateway.time.sleep') as sleep:
+            open_with_retry(opener, object(), 180, sleep=sleep)
+        self.assertEqual(opener.calls, 1)
+        sleep.assert_not_called()
+
+    def test_parent_upstream_retries_connection_failure(self):
+        response = io.BytesIO(b'ok')
+        outcomes = [URLError('temporary'), response]
+        class Opener:
+            def __init__(self): self.calls = 0
+            def open(self, request, **kwargs):
+                result = outcomes[self.calls]; self.calls += 1
+                if isinstance(result, Exception): raise result
+                return result
+        opener = Opener()
+        with patch('native_gateway.time.sleep') as sleep:
+            self.assertIs(open_with_retry(opener, object(), 180, sleep=sleep), response)
+        self.assertEqual(opener.calls, 2)
 
     def test_desktop_does_not_inherit_external_keys_or_isolation_hooks(self):
         with patch.dict(os.environ, {'DEEPSEEK_API_KEY': 'secret-test', 'CODEX_APP_SERVER_WS_URL': 'ws://test', 'CODEX_CLI_PATH': 'test'}):

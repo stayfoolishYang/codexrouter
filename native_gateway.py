@@ -13,7 +13,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
@@ -21,6 +21,22 @@ ALIASES = {'native_delegate_task': 'spawn_agent', 'native_followup_task': 'follo
            'native_message_task': 'send_message'}
 BUILD_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 ROUTE_LOG_LOCK = threading.Lock()
+
+RETRYABLE_UPSTREAM_STATUSES = {502, 503, 504}
+
+def open_with_retry(opener, request, timeout, attempts=3, delays=(0.4, 1.2), sleep=time.sleep):
+    """Retry transient failures that happen before an SSE response starts."""
+    for attempt in range(attempts):
+        try:
+            return opener.open(request, timeout=timeout)
+        except HTTPError as error:
+            if error.code not in RETRYABLE_UPSTREAM_STATUSES or attempt + 1 >= attempts:
+                raise
+            error.close()
+        except (URLError, TimeoutError, ConnectionError):
+            if attempt + 1 >= attempts:
+                raise
+        sleep(delays[min(attempt, len(delays) - 1)])
 
 def log_route(route, requested, selected, queued_seconds):
     path = route.get('route_log')
@@ -299,7 +315,7 @@ class Handler(BaseHTTPRequestHandler):
                 upstream, first_line = open_with_queue_fallback(opener, endpoint, headers, req, route)
             else:
                 request = Request(endpoint, data=json.dumps(req, ensure_ascii=False).encode(), headers=headers)
-                upstream, first_line = opener.open(request, timeout=180), None
+                upstream, first_line = open_with_retry(opener, request, timeout=180), None
             with upstream:
                 content_type = upstream.headers.get('Content-Type', '')
                 if not content_type:
